@@ -1,7 +1,7 @@
 from theia.material import HenyeyGreensteinPhaseFunction
 from theia.material import DispersionFreeMedium
 
-class LayerMediumModel(
+class LayerMediumModel_old(
     HenyeyGreensteinPhaseFunction,
     DispersionFreeMedium
 ):
@@ -31,7 +31,7 @@ import numpy as np
 import theia.units as u
 
 
-class LayerMediumModel_new(HenyeyGreensteinPhaseFunction):
+class LayerMediumModel(HenyeyGreensteinPhaseFunction):
 
     def __init__(
         self,

@@ -47,44 +47,30 @@ class LayerStack:
     
         self.depth = data[:, 0]
         self.z = 1948.07 - self.depth
-        self.mu_s = data[:, 1]
-        self.mu_a = data[:, 2]
-        #self.be400 = data[:, 1]
-        #self.adust400 = data[:, 2]
-        #self.delta_tau = data[:, 3]
+        
+        self.be400 = data[:, 1]
+        self.adust400 = data[:, 2]
+        self.delta_tau = data[:, 3]
+
 
     def _create_media(self):
+
         self.media = []
+    
         for i in range(len(self.depth)):
+    
             model = LayerMediumModel(
-                mu_a=self.mu_a[i],
-                mu_s=self.mu_s[i],
-                g=self.g,
-                n=self.n,
-                ng=self.ng,
+                be400=self.be400[i],
+                adust400=self.adust400[i],
+                delta_tau=self.delta_tau[i],
                 name=f"Layer_{i}",
             )
-            medium = model.createMedium(physicModel = Attenuating())
+    
+            medium = model.createMedium(
+                physicModel=Attenuating()
+            )
+    
             self.media.append(medium)
-
-    #def _create_media(self):
-
-        #self.media = []
-    
-        #for i in range(len(self.depth)):
-    
-            #model = LayerMediumModel(
-                #be400=self.be400[i],
-                #adust400=self.adust400[i],
-                #delta_tau=self.delta_tau[i],
-                #name=f"Layer_{i}",
-            #)
-    
-            #medium = model.createMedium(
-             #   physicModel=Attenuating()
-            #)
-    
-            #self.media.append(medium)
         
     def _create_materials(self):
 
