@@ -179,7 +179,7 @@ class PocamLightSource(LightSource):
         )
     def _createTimeProfile(self):
 
-        width = 15.0
+        width = 2.0 # FB_WIDTH = 2 corresponds to IceTray PulseWidth = 1 ns
     
         class Dist:                                       #das ist die Wahrscheinlichkeitsdichte pdf
             def pdf(self, x):
