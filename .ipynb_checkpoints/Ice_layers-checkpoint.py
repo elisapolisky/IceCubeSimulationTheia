@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 import theia.units as u
 import theia.material
-from LayerMediumModel import LayerMediumModel
+from material_ice import LayerMediumModel
 from theia.surface import BorderSurface
 from theia.surface import AbsorbingSurface
 from theia.material import Material
@@ -67,89 +67,116 @@ class LayerStack:
             )
     
             medium = model.createMedium(
-                physicModel=Attenuating()
+                physicModel=Attenuating(),
+                numSamples=8192,
+                #numSamples=16384,
             )
     
             self.media.append(medium)
         
     def _create_materials(self):
-
+    
         self.materials = []
     
-        for i, medium in enumerate(self.media):
+        for i in range(len(self.media)):
+    
+            if i == 0:
+                outside = None # draußen ist Vakuum
+            else:
+                outside = self.media[i - 1]
     
             material = Material(
-                name=f"Layer_{i}",
-                inside=medium,
-                outside=medium,
-                physicModel= BorderSurface(),
-                #flags=...
+                name=f"Boundary_{i}",
+                inside=self.media[i],
+                outside=self.media[i - 1],
+                physicModel=BorderSurface(),
+                flags=MaterialFlags.VOLUME_BORDER,
             )
-
             self.materials.append(material)
-            
-        dom_layer = self.get_layer(-383.40)    
+    
+        # DOM
+        dom_layer = self.get_layer(-383.40)
+    
         dom_material = Material(
             name="DOM",
             inside=self.media[dom_layer],
             outside=self.media[dom_layer],
             physicModel=AbsorbingSurface(),
-            flags= (MaterialFlags.DETECTOR
-                    | MaterialFlags.BLACK_BODY
-                    | MaterialFlags.SKIP_MEDIA_MISMATCH_TEST
-            )
+            flags=(
+                MaterialFlags.DETECTOR
+                | MaterialFlags.BLACK_BODY
+                | MaterialFlags.SKIP_MEDIA_MISMATCH_TEST
+            ),
         )
+    
         self.materials.append(dom_material)
-        
+    
         self.material_store = MaterialStore(
             material=self.materials
         )
-            
+                
     def _create_geometry(self):
-
-        box = trimesh.creation.box(
-            extents=(
-                self.width,
-                self.length,
-                self.layer_thickness,
-            )
+    
+        half_width = 0.5 * self.width
+        half_length = 0.5 * self.length
+        
+        vertices = np.array([
+            [-half_width, -half_length, 0.0],
+            [ half_width, -half_length, 0.0],
+            [ half_width,  half_length, 0.0],
+            [-half_width,  half_length, 0.0],
+        ])
+        
+        faces = np.array([
+            [0, 1, 2],
+            [0, 2, 3],
+        ])
+        
+        plane = trimesh.Trimesh(
+            vertices=vertices,
+            faces=faces,
+            process=False,
         )
+        
+        plane_mesh = _createMeshFromTrimesh(plane)
+        
+        
         sphere = trimesh.creation.icosphere(
-            subdivisions=2,
+            subdivisions=3,
             radius=0.5,
         )
-            
-        box_mesh = _createMeshFromTrimesh(box)
+        
         sphere_mesh = _createMeshFromTrimesh(sphere)
+        
     
         self.mesh_store = MeshStore({
-            "layer": box_mesh,
+            "boundary": plane_mesh,
             "dom": sphere_mesh,
         })
-    
+        
         self.instances = []
-    
-        for i in range(len(self.depth)):
-    
-            transform = Transform.Translation(
-                0.0,
-                0.0,
-                self.z[i]
+        
+        for i in range(1, len(self.media)):
+        
+            boundary_z = 0.5 * (
+                self.z[i - 1] + self.z[i]
             )
-    
+        
             instance = self.mesh_store.createInstance(
-                key="layer",
-                material=f"Layer_{i}",
-                transform=transform,
+                key="boundary",
+                material=f"Boundary_{i}",
+                transform=Transform.Translation(
+                    0.0, 0.0, boundary_z
+                ),
             )
-        
-        
+            
             self.instances.append(instance)
         
-        layer = self.get_layer(-383.40)
+        
+    
         dom = self.mesh_store.createInstance(
             key="dom",
-            material= "DOM",      
+            material="DOM",
             transform=Transform.Translation(
                 31.25,
                 -72.93,
@@ -157,10 +184,8 @@ class LayerStack:
             ),
             detectorId=1,
         )
-
         self.instances.append(dom)
-
-
+        
     def build_scene(self):
 
         self.scene = Scene(
