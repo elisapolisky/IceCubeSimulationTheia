@@ -7,7 +7,7 @@ from scipy.stats.sampling import NumericalInversePolynomial
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.stats.sampling import NumericalInversePolynomial
-
+from theia.light import LightSource, WavelengthSource
 import hephaistos as hp
 from hephaistos.pipeline import PipelineStage, SourceCodeMixin
 from hephaistos.queue import IOQueue
@@ -26,7 +26,7 @@ from warnings import warn
 
 from collections.abc import Callable
 from numpy.typing import ArrayLike, NDArray
-from theia.light import LightSource
+from theia.light import LightSource, WavelengthSource, FunctionWavelengthSource
 
 _pulse_FB_WIDTH15 = np.array(
           [[  0.00000000e+00,   1.00000000e+00,   2.00000000e+00,
@@ -117,6 +117,148 @@ def _the_pulse(x, FB_WIDTH):
         return float(result[0])
 
     return result
+
+class PocamKapu405WavelengthSource(WavelengthSource):
+    """
+    Wavelength sampler for IceTray/CLSim
+    POCAMKapu405nmIsotropic.
+
+    Uses the tabulated spectrum
+    POCAM_XRL-400-5E_datasheet.txt.
+    """
+
+    class WavelengthParams(Structure):
+        _fields_ = [
+            ("_table", c_int64),
+            ("_contrib", c_float),
+        ]
+
+    def __init__(self, numSamples: int = 4096) -> None:
+        super().__init__(
+            nRNGSamples=1,
+            params={
+                "WavelengthParams":
+                PocamKapu405WavelengthSource.WavelengthParams
+            },
+        )
+
+        wavelengths_nm = np.array([
+            380.00, 381.25, 382.50, 383.75, 385.00,
+            386.25, 387.50, 388.75, 390.00, 391.25,
+            392.50, 393.75, 395.00, 396.25, 397.50,
+            398.75, 400.00, 401.25, 402.50, 403.75,
+            405.00, 406.25, 407.50, 408.75, 410.00,
+            411.25, 412.50, 413.75, 415.00, 416.25,
+            417.50, 418.75, 420.00, 421.25, 422.50,
+            423.75, 425.00, 426.25, 427.50, 428.75,
+            430.00,
+        ])
+
+        intensity = np.array([
+            0.0147, 0.0153, 0.0184, 0.0249, 0.0364,
+            0.0514, 0.0669, 0.0953, 0.1234, 0.1622,
+            0.2335, 0.3073, 0.4108, 0.5157, 0.6145,
+            0.7925, 0.8858, 0.9912, 0.9971, 0.9724,
+            0.8651, 0.7674, 0.6179, 0.5160, 0.4123,
+            0.3119, 0.2687, 0.2134, 0.1881, 0.1496,
+            0.1303, 0.1035, 0.0830, 0.0705, 0.0575,
+            0.0474, 0.0407, 0.0348, 0.0296, 0.0249,
+            0.0208,
+        ])
+
+        # Same normalization used by CLSim
+        intensity = intensity / 15.33201835267
+
+        # Convert wavelength grid into Theia internal units
+        wavelength = wavelengths_nm * u.nm
+
+        # Integral of each linear segment
+        dx = np.diff(wavelength)
+        segment_area = (
+            0.5
+            * (intensity[:-1] + intensity[1:])
+            * dx
+        )
+
+        cumulative = np.concatenate(
+            ([0.0], np.cumsum(segment_area))
+        )
+
+        total_area = cumulative[-1]
+
+        # Uniform CDF values for inverse-CDF lookup table
+        probabilities = np.linspace(
+            0.0,
+            1.0,
+            numSamples,
+        )
+
+        target_area = probabilities * total_area
+
+        # Determine in which tabulated segment each CDF value lies
+        segment_idx = np.searchsorted(
+            cumulative,
+            target_area,
+            side="right",
+        ) - 1
+
+        segment_idx = np.clip(
+            segment_idx,
+            0,
+            len(wavelength) - 2,
+        )
+
+        x0 = wavelength[segment_idx]
+        y0 = intensity[segment_idx]
+
+        x1 = wavelength[segment_idx + 1]
+        y1 = intensity[segment_idx + 1]
+
+        local_area = (
+            target_area
+            - cumulative[segment_idx]
+        )
+
+        local_dx = x1 - x0
+        slope = (y1 - y0) / local_dx
+
+        # Invert the integral of the linear PDF:
+        #
+        # local_area = y0*t + 0.5*slope*t^2
+        #
+        # The rationalized form below is numerically stable.
+        disc = np.sqrt(
+            y0**2
+            + 2.0 * slope * local_area
+        )
+
+        t = np.where(
+            np.abs(slope) < 1e-15,
+            local_area / y0,
+            2.0 * local_area / (y0 + disc),
+        )
+
+        inverse_cdf = x0 + t
+
+        # Ensure exact endpoints
+        inverse_cdf[0] = wavelength[0]
+        inverse_cdf[-1] = wavelength[-1]
+
+        # Upload inverse CDF as lookup table
+        table = Table(inverse_cdf)
+        self._table_gpu = table.upload()
+
+        self.setParams(
+            _table=self._table_gpu.address,
+            _contrib=total_area,
+        )
+
+    @property
+    def sourceCode(self) -> str:
+        return loadShader(
+            "wavelengthsource/function.glsl"
+        )
+
 
 class PocamLightSource(LightSource):
     """

@@ -106,8 +106,8 @@ class LayerMediumModel(HGSAMPhaseFunction):
         B=6617.754394531250,
         g=0.9,
         fSL=0.35,
-        n=1.15,
-        ng=1.35,
+        n=1.3189791277877125,
+        ng=1.3546359258072391,
         name="layer",
     ):
         super().__init__(
