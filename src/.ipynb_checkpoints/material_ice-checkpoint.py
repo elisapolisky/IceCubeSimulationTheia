@@ -106,8 +106,6 @@ class LayerMediumModel(HGSAMPhaseFunction):
         B=6617.754394531250,
         g=0.9,
         fSL=0.35,
-        n=1.3189791277877125,
-        ng=1.3546359258072391,
         name="layer",
     ):
         super().__init__(
@@ -125,17 +123,65 @@ class LayerMediumModel(HGSAMPhaseFunction):
         self.A = A
         self.B = B
 
-        self.n = n
-        self.ng = ng
 
     @medium_property
     def refractive_index(self, wavelength):
-        return np.ones_like(wavelength) * self.n
-
+    
+        x = wavelength / (1000.0 * u.nm)
+    
+        n0 = 1.55749
+        n1 = -1.57988
+        n2 = 3.99993
+        n3 = -4.68271
+        n4 = 2.09354
+    
+        return (
+            n0
+            + x * (
+                n1
+                + x * (
+                    n2
+                    + x * (
+                        n3
+                        + x * n4
+                    )
+                )
+            )
+        )
+    
+    
     @medium_property
     def group_velocity(self, wavelength):
-        return np.ones_like(wavelength) / self.ng * u.c
-
+    
+        x = wavelength / (1000.0 * u.nm)
+    
+        # Phase refractive index
+        n = self.refractive_index(wavelength)
+    
+        # CLSim group-index correction
+        g0 = 1.227106
+        g1 = -0.954648
+        g2 = 1.42568
+        g3 = -0.711832
+        g4 = 0.0
+    
+        correction = (
+            g0
+            + x * (
+                g1
+                + x * (
+                    g2
+                    + x * (
+                        g3
+                        + x * g4
+                    )
+                )
+            )
+        )
+    
+        ng = n * correction
+    
+        return (1.0 / ng) * u.c
     @medium_property
     def scattering_coef(self, wavelength):
         wavelength = np.asarray(wavelength)
