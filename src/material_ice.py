@@ -68,21 +68,11 @@ class HGSAMPhaseFunction(NumericalPhaseSamplingMixin):
         g = self.g
         f = self.fSL
 
-        hg = (
-            (1.0 - g**2)
-            / (
-                4.0 * np.pi
-                * (1.0 + g**2 - 2.0 * g * x) ** 1.5
-            )
-        )
+        hg = ((1.0 - g**2)/ (4.0 * np.pi * (1.0 + g**2 - 2.0 * g * x) ** 1.5 ))
 
         sam_alpha = 2.0 * g / (1.0 - g)
 
-        sam = (
-            (1.0 + sam_alpha)
-            / (4.0 * np.pi)
-            * ((1.0 + x) / 2.0) ** sam_alpha
-        )
+        sam = ((1.0 + sam_alpha)/ (4.0 * np.pi) * ((1.0 + x) / 2.0) ** sam_alpha)
 
         return (1.0 - f) * hg + f * sam
 
@@ -135,21 +125,8 @@ class LayerMediumModel(HGSAMPhaseFunction):
         n3 = -4.68271
         n4 = 2.09354
     
-        return (
-            n0
-            + x * (
-                n1
-                + x * (
-                    n2
-                    + x * (
-                        n3
-                        + x * n4
-                    )
-                )
-            )
-        )
-    
-    
+        return (n0 + x * (n1 + x * (n2 + x * (n3 + x * n4))))
+           
     @medium_property
     def group_velocity(self, wavelength):
     
@@ -165,31 +142,17 @@ class LayerMediumModel(HGSAMPhaseFunction):
         g3 = -0.711832
         g4 = 0.0
     
-        correction = (
-            g0
-            + x * (
-                g1
-                + x * (
-                    g2
-                    + x * (
-                        g3
-                        + x * g4
-                    )
-                )
-            )
-        )
-    
+        correction = (g0 + x * (g1 + x * (g2+ x * (g3 + x * g4))))
+        
         ng = n * correction
     
         return (1.0 / ng) * u.c
+        
     @medium_property
     def scattering_coef(self, wavelength):
         wavelength = np.asarray(wavelength)
     
-        be = (
-            self.be400
-            * (wavelength / (400 * u.nm))**(-self.alpha)
-        )
+        be = (self.be400 * (wavelength / (400 * u.nm))**(-self.alpha))
     
         return be / (1.0 - self.g)
     
@@ -198,15 +161,8 @@ class LayerMediumModel(HGSAMPhaseFunction):
     def absorption_coef(self, wavelength):
         wavelength = np.asarray(wavelength)
     
-        a_dust = (
-            self.adust400
-            * (wavelength / (400 * u.nm))**(-self.kappa)
-        )
+        a_dust = (self.adust400 * (wavelength / (400 * u.nm))**(-self.kappa))
     
-        a_ice = (
-            self.A
-            * np.exp(-self.B / (wavelength / u.nm))
-            * (1.0 + 0.01 * self.delta_tau)
-        )
+        a_ice = (self.A * np.exp(-self.B / (wavelength / u.nm)) * (1.0 + 0.01 * self.delta_tau))
     
         return a_dust + a_ice

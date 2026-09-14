@@ -25,10 +25,6 @@ class LayerStack:
         self.layer_thickness = 10 * u.m
         self.width=1000*u.m
         self.length=1000*u.m
-        
-        self.g = 0.9
-        self.n = 1.15
-        self.ng = 1.35
 
         self.media = []
         self.materials = []
@@ -143,7 +139,7 @@ class LayerStack:
         
         sphere = trimesh.creation.icosphere(
             subdivisions=3,
-            radius=0.5,
+            radius=0.1651,
         )
         
         sphere_mesh = _createMeshFromTrimesh(sphere)

@@ -166,27 +166,21 @@ class PocamKapu405WavelengthSource(WavelengthSource):
             0.0208,
         ])
 
-        # Same normalization used by CLSim
+        # Gleiche Normalisierung wie bei CLSim
         intensity = intensity / 15.33201835267
 
-        # Convert wavelength grid into Theia internal units
+        #in nm umrechnen 
         wavelength = wavelengths_nm * u.nm
 
         # Integral of each linear segment
         dx = np.diff(wavelength)
-        segment_area = (
-            0.5
-            * (intensity[:-1] + intensity[1:])
-            * dx
-        )
+        segment_area = (0.5 * (intensity[:-1] + intensity[1:]) * dx)
 
-        cumulative = np.concatenate(
-            ([0.0], np.cumsum(segment_area))
-        )
+        cumulative = np.concatenate(([0.0], np.cumsum(segment_area)))
 
         total_area = cumulative[-1]
 
-        # Uniform CDF values for inverse-CDF lookup table
+        # Uniform CDF values (für das lookup table der inversen CDF)
         probabilities = np.linspace(
             0.0,
             1.0,
@@ -195,7 +189,6 @@ class PocamKapu405WavelengthSource(WavelengthSource):
 
         target_area = probabilities * total_area
 
-        # Determine in which tabulated segment each CDF value lies
         segment_idx = np.searchsorted(
             cumulative,
             target_area,
@@ -222,11 +215,7 @@ class PocamKapu405WavelengthSource(WavelengthSource):
         local_dx = x1 - x0
         slope = (y1 - y0) / local_dx
 
-        # Invert the integral of the linear PDF:
-        #
-        # local_area = y0*t + 0.5*slope*t^2
-        #
-        # The rationalized form below is numerically stable.
+
         disc = np.sqrt(
             y0**2
             + 2.0 * slope * local_area
@@ -240,11 +229,9 @@ class PocamKapu405WavelengthSource(WavelengthSource):
 
         inverse_cdf = x0 + t
 
-        # Ensure exact endpoints
         inverse_cdf[0] = wavelength[0]
         inverse_cdf[-1] = wavelength[-1]
 
-        # Upload inverse CDF as lookup table
         table = Table(inverse_cdf)
         self._table_gpu = table.upload()
 
