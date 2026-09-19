@@ -152,7 +152,7 @@ class LayerMediumModel(HGSAMPhaseFunction):
     def scattering_coef(self, wavelength):
         wavelength = np.asarray(wavelength)
     
-        be = (self.be400 * (wavelength / (400 * u.nm))**(-self.alpha))
+        be = (self.be400 * (wavelength / (400 * u.nm))**(-self.kappa))
     
         return be / (1.0 - self.g)
     
@@ -161,7 +161,7 @@ class LayerMediumModel(HGSAMPhaseFunction):
     def absorption_coef(self, wavelength):
         wavelength = np.asarray(wavelength)
     
-        a_dust = (self.adust400 * (wavelength / (400 * u.nm))**(-self.kappa))
+        a_dust = (self.adust400 * (wavelength / (400 * u.nm))**(-self.alpha))
     
         a_ice = (self.A * np.exp(-self.B / (wavelength / u.nm)) * (1.0 + 0.01 * self.delta_tau))
     
